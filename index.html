@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مولد القاموس الفوري البرقي - النسخة المتقدمة</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background: #020617;
+            color: #f1f5f9;
+        }
+        .word-card {
+            transition: all 0.2s ease;
+            animation: fadeIn 0.3s forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .glow-text {
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.6);
+        }
+        .stats-box {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            backdrop-filter: blur(12px);
+        }
+        #resultsContainer::-webkit-scrollbar {
+            width: 8px;
+        }
+        #resultsContainer::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4 md:p-8">
+
+    <!-- Header -->
+    <header class="text-center mb-6">
+        <h1 class="text-4xl md:text-5xl font-bold text-sky-400 glow-text mb-2">المعالج اللغوي الخارق ⚡</h1>
+        <p class="text-slate-400">توليد احتمالات لغوية لا نهائية وأوزان صرفية بقوة الـ CPU</p>
+    </header>
+
+    <!-- Master Controls -->
+    <div class="max-w-5xl mx-auto w-full grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="stats-box p-3 rounded-xl">
+            <label class="block text-xs text-sky-400 mb-1 font-bold">نمط التوليد</label>
+            <select id="modeSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none focus:border-sky-500">
+                <option value="random">حروف عشوائية (ضرب حروف)</option>
+                <option value="patterns">أوزان صرفية (استفعل، أفعل..)</option>
+            </select>
+        </div>
+        <div class="stats-box p-3 rounded-xl">
+            <label class="block text-xs text-sky-400 mb-1 font-bold">طول الكلمة / الجذر</label>
+            <input type="number" id="wordLength" value="3" min="1" max="12" 
+                   class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none focus:border-sky-500">
+        </div>
+        <div class="stats-box p-3 rounded-xl">
+            <label class="block text-xs text-sky-400 mb-1 font-bold">اللغة</label>
+            <select id="langSelect" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm outline-none focus:border-sky-500">
+                <option value="ar">العربية 🇸🇦</option>
+                <option value="en">English 🇺🇸</option>
+            </select>
+        </div>
+        <div class="flex flex-col gap-2">
+            <button id="startBtn" class="flex-1 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition-all shadow-lg active:scale-95 text-sm">
+                بدء المحرك ⚡
+            </button>
+            <button id="copyBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all text-xs py-1">
+                نسخ الكل 📋
+            </button>
+        </div>
+    </div>
+
+    <!-- Prediction & Real-time Stats -->
+    <div class="max-w-5xl mx-auto w-full grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="bg-blue-900/20 border border-blue-500/30 p-3 rounded-lg text-center">
+            <div class="text-[10px] uppercase tracking-wider text-blue-400">إجمالي الاحتمالات المتوقعة</div>
+            <div id="prediction" class="text-xl font-bold text-white">-</div>
+        </div>
+        <div class="bg-green-900/20 border border-green-500/30 p-3 rounded-lg text-center">
+            <div class="text-[10px] uppercase tracking-wider text-green-400">الكلمات المتولدة حالياً</div>
+            <div id="count" class="text-xl font-bold text-white">0</div>
+        </div>
+        <div class="bg-purple-900/20 border border-purple-500/30 p-3 rounded-lg text-center">
+            <div class="text-[10px] uppercase tracking-wider text-purple-400">سرعة المعالجة (كلمة/ث)</div>
+            <div id="speed" class="text-xl font-bold text-white">0</div>
+        </div>
+    </div>
+
+    <!-- Output Area -->
+    <div class="max-w-5xl mx-auto w-full flex-grow bg-slate-900/80 rounded-2xl border border-slate-800 p-4 overflow-hidden flex flex-col">
+        <div id="resultsContainer" class="flex-grow overflow-y-auto pr-2">
+            <div id="grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                <!-- Data injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const alphabets = {
+            ar: "أبتثجحخدذرزسشصضطظعغفقكلمنهوي",
+            en: "abcdefghijklmnopqrstuvwxyz"
+        };
+
+        const arabicPatterns = [
+            { p: "است{0}{1}{2}ة", desc: "استفعلة" },
+            { p: "ت{0}{1}{2}", desc: "تفعل" },
+            { p: "أ{0}{1}{2}", desc: "أفعل" },
+            { p: "{0}ا{1}{2}", desc: "فاعل" },
+            { p: "م{0}{1}و{2}", desc: "مفعول" },
+            { p: "م{0}{1}{2}", desc: "مفعل" },
+            { p: "ا{0}{1}ا{2}", desc: "افعال" },
+            { p: "است{0}{1}{2}", desc: "استفعل" }
+        ];
+
+        let isRunning = false;
+        let wordCount = 0;
+        let startTime = 0;
+        let interval;
+        let allResults = [];
+
+        const startBtn = document.getElementById('startBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const grid = document.getElementById('grid');
+        const countDisplay = document.getElementById('count');
+        const speedDisplay = document.getElementById('speed');
+        const predictionDisplay = document.getElementById('prediction');
+        const wordLengthInput = document.getElementById('wordLength');
+        const langSelect = document.getElementById('langSelect');
+        const modeSelect = document.getElementById('modeSelect');
+
+        // Calculate Mathematical Prediction
+        function updatePrediction() {
+            const n = alphabets[langSelect.value].length;
+            const r = parseInt(wordLengthInput.value);
+            const mode = modeSelect.value;
+            
+            let total;
+            if (mode === "random") {
+                total = Math.pow(n, r);
+            } else {
+                // For patterns, it's (alphabet^root_length) * number of patterns
+                total = Math.pow(n, 3) * arabicPatterns.length;
+            }
+            
+            predictionDisplay.innerText = total > 1e12 ? "تريليونات (+10¹²)" : total.toLocaleString();
+        }
+
+        [wordLengthInput, langSelect, modeSelect].forEach(el => el.addEventListener('change', updatePrediction));
+        updatePrediction();
+
+        function generateWord() {
+            const lang = langSelect.value;
+            const mode = modeSelect.value;
+            const alpha = alphabets[lang];
+            const len = parseInt(wordLengthInput.value);
+
+            if (mode === "patterns" && lang === "ar") {
+                // Pick a random pattern
+                const pattern = arabicPatterns[Math.floor(Math.random() * arabicPatterns.length)].p;
+                // Generate 3 root letters
+                const r1 = alpha[Math.floor(Math.random() * alpha.length)];
+                const r2 = alpha[Math.floor(Math.random() * alpha.length)];
+                const r3 = alpha[Math.floor(Math.random() * alpha.length)];
+                return pattern.replace("{0}", r1).replace("{1}", r2).replace("{2}", r3);
+            } else {
+                let res = '';
+                for (let i = 0; i < len; i++) {
+                    res += alpha[Math.floor(Math.random() * alpha.length)];
+                }
+                return res;
+            }
+        }
+
+        function toggleEngine() {
+            if (isRunning) {
+                isRunning = false;
+                startBtn.innerText = "بدء المحرك ⚡";
+                startBtn.className = startBtn.className.replace('bg-red-600', 'bg-sky-600');
+                clearInterval(interval);
+            } else {
+                isRunning = true;
+                wordCount = 0;
+                allResults = [];
+                startTime = Date.now();
+                grid.innerHTML = '';
+                startBtn.innerText = "إيقاف المحرك 🛑";
+                startBtn.className = startBtn.className.replace('bg-sky-600', 'bg-red-600');
+
+                interval = setInterval(() => {
+                    const fragment = document.createDocumentFragment();
+                    // Process batch
+                    for(let i = 0; i < 40; i++) {
+                        const word = generateWord();
+                        allResults.push(word);
+                        
+                        const div = document.createElement('div');
+                        div.className = "word-card bg-slate-800/50 p-2 rounded border border-slate-700 text-center text-[13px] hover:border-sky-500 cursor-default";
+                        div.innerText = word;
+                        fragment.appendChild(div);
+                        wordCount++;
+                    }
+                    
+                    grid.appendChild(fragment);
+                    
+                    // Stats update
+                    const now = Date.now();
+                    const sec = (now - startTime) / 1000;
+                    countDisplay.innerText = wordCount.toLocaleString();
+                    speedDisplay.innerText = Math.floor(wordCount / sec).toLocaleString();
+
+                    // Auto-scroll to bottom
+                    const container = document.getElementById('resultsContainer');
+                    container.scrollTop = container.scrollHeight;
+                }, 20);
+            }
+        }
+
+        copyBtn.addEventListener('click', () => {
+            if (allResults.length === 0) return;
+            const text = allResults.join(', ');
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+            
+            const originalText = copyBtn.innerText;
+            copyBtn.innerText = "تم النسخ! ✅";
+            setTimeout(() => copyBtn.innerText = originalText, 2000);
+        });
+
+        startBtn.addEventListener('click', toggleEngine);
+
+    </script>
+</body>
+</html>
+
+  
